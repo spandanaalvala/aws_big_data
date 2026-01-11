@@ -16,10 +16,22 @@ phases:
       - aws cloudformation validate-template --template-body file://stepfunction-incremental.yaml
 
       # Package Lambda functions
-      - cd lambda/full_load && zip -r full_load.zip handler.py && aws s3 cp full_load.zip s3://spandweather-dev-artifacts/lambda/full_load.zip
-      - cd ../streaming_producer && zip -r streaming_producer.zip handler.py && aws s3 cp streaming_producer.zip s3://spandweather-dev-artifacts/lambda/streaming_producer.zip
-      - cd ../kinesis_consumer && zip -r kinesis_consumer.zip handler.py && aws s3 cp kinesis_consumer.zip s3://spandweather-dev-artifacts/lambda/kinesis_consumer.zip
-      - cd ../../
+      
+      - cd bronze_ingestion
+      - zip -r bronze_ingestion.zip handler.py
+      - aws s3 cp bronze_ingestion.zip s3://spandweather-dev-artifacts/lambda/bronze_ingestion.zip
+      - cd ..
+      
+      - cd lambda/incremental_producer
+      - zip -r incremental_producer.zip handler.py
+      - aws s3 cp incremental_producer.zip s3://spandweather-dev-artifacts/lambda/incremental_producer.zip
+      - cd ../..
+      
+      - cd lambda/kinesis_consumer
+      - zip -r kinesis_consumer.zip handler.py
+      - aws s3 cp kinesis_consumer.zip s3://spandweather-dev-artifacts/lambda/kinesis_consumer.zip
+      - cd ../..
+
 
       # Upload Glue scripts
       - aws s3 cp glue/silver/cleanse.py s3://spandweather-dev-artifacts/glue/silver/cleanse.py
