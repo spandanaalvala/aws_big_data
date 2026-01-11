@@ -13,7 +13,7 @@ phases:
       - aws cloudformation validate-template --template-body file://bronze-lambda.yaml
       - aws cloudformation validate-template --template-body file://silver-glue.yaml
       - aws cloudformation validate-template --template-body file://gold-glue.yaml
-      - aws cloudformation validate-template --template-body file://stepfunction.yaml
+      - aws cloudformation validate-template --template-body file://stepfunction-incremental.yaml
 
       # Package Lambda functions
       - cd lambda/full_load && zip -r full_load.zip handler.py && aws s3 cp full_load.zip s3://spandweather-dev-artifacts/lambda/full_load.zip
