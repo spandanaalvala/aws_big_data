@@ -1,0 +1,38 @@
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      python: 3.11
+
+  build:
+    commands:
+      # Validate CloudFormation
+      - aws cloudformation validate-template --template-body file://foundation.yaml
+      - aws cloudformation validate-template --template-body file://iam.yaml
+      - aws cloudformation validate-template --template-body file://bronze-lambda.yaml
+      - aws cloudformation validate-template --template-body file://silver-glue.yaml
+      - aws cloudformation validate-template --template-body file://gold-glue.yaml
+      - aws cloudformation validate-template --template-body file://stepfunction-incremental.yaml
+
+      # Package Lambda functions
+      
+      - cd bronze_ingestion
+      - zip -r bronze_ingestion.zip handler.py
+      - aws s3 cp bronze_ingestion.zip s3://spandweather-dev-artifacts/lambda/bronze_ingestion.zip
+      - cd ..
+      
+      - cd lambda/incremental_producer
+      - zip -r incremental_producer.zip handler.py
+      - aws s3 cp incremental_producer.zip s3://spandweather-dev-artifacts/lambda/incremental_producer.zip
+      - cd ../..
+      
+      - cd lambda/kinesis_consumer
+      - zip -r kinesis_consumer.zip handler.py
+      - aws s3 cp kinesis_consumer.zip s3://spandweather-dev-artifacts/lambda/kinesis_consumer.zip
+      - cd ../..
+
+
+      # Upload Glue scripts
+      - aws s3 cp glue/silver/cleanse.py s3://spandweather-dev-artifacts/glue/silver/cleanse.py
+      - aws s3 cp glue/gold/star_schema.py s3://spandweather-dev-artifacts/glue/gold/star_schema.py
