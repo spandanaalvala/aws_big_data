@@ -1,0 +1,64 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  SpandWeather IAM Stack v1
+  Console-safe roles (no inline policies)
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: spandweather
+
+  Environment:
+    Type: String
+    Default: dev
+
+Resources:
+
+  ### Bronze Lambda Role (v1) ###
+  BronzeLambdaRoleV1:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${ProjectName}-${Environment}-bronze-lambda-role-v1"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/AmazonS3FullAccess
+        - arn:aws:iam::aws:policy/AmazonKinesisFullAccess
+        - arn:aws:iam::aws:policy/AmazonSQSFullAccess
+        - arn:aws:iam::aws:policy/AmazonSNSFullAccess
+
+  ### Glue Job Role (v1) ###
+  GlueJobRoleV1:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${ProjectName}-${Environment}-glue-job-role-v1"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: glue.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSGlueServiceRole
+        - arn:aws:iam::aws:policy/AmazonS3FullAccess
+        - arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess
+        - arn:aws:iam::aws:policy/AmazonSNSFullAccess
+
+Outputs:
+
+  BronzeLambdaRoleArn:
+    Value: !GetAtt BronzeLambdaRoleV1.Arn
+    Export:
+      Name: !Sub "${ProjectName}-${Environment}-bronze-lambda-role-arn-v1"
+
+  GlueJobRoleArn:
+    Value: !GetAtt GlueJobRoleV1.Arn
+    Export:
+      Name: !Sub "${ProjectName}-${Environment}-glue-job-role-arn-v1"

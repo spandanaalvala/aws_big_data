@@ -1,0 +1,42 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  SpandWeather Silver Layer
+  Bronze to Silver cleansing (no DQ yet)
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: spandweather
+
+  Environment:
+    Type: String
+    Default: dev
+
+Resources:
+
+  ### Glue Silver Job ###
+  SilverGlueJob:
+    Type: AWS::Glue::Job
+    Properties:
+      Name: !Sub "${ProjectName}-${Environment}-silver-cleanse"
+      Role: !ImportValue spandweather-dev-glue-job-role-arn-v1
+      GlueVersion: "5.0"
+      WorkerType: G.1X
+      NumberOfWorkers: 2
+      ExecutionProperty:
+        MaxConcurrentRuns: 1
+      Command:
+        Name: glueetl
+        PythonVersion: "3"
+        ScriptLocation: !Sub
+          - "s3://spandweather-dev-artifacts/glue/silver/cleanse.py"
+          - Bucket: !ImportValue spandweather-dev-datalake-bucket
+      DefaultArguments:
+        "--job-language": "python"
+        "--enable-glue-datacatalog": "true"
+
+Outputs:
+  SilverGlueJobName:
+    Value: !Ref SilverGlueJob
+    Export:
+      Name: !Sub "${ProjectName}-${Environment}-silver-glue-job"

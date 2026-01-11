@@ -1,0 +1,100 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: SpandWeather Incremental Pipeline Step Function
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: spandweather
+  Environment:
+    Type: String
+    Default: dev
+
+Resources:
+  StepFnRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${ProjectName}-${Environment}-stepfn-role"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: states.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AWSGlueConsoleFullAccess
+        - arn:aws:iam::aws:policy/AmazonSNSFullAccess
+
+  IncrementalStateMachine:
+    Type: AWS::StepFunctions::StateMachine
+    Properties:
+      StateMachineName: !Sub "${ProjectName}-${Environment}-incremental-pipeline"
+      RoleArn: !GetAtt StepFnRole.Arn
+      # We use the mapping format of !Sub to avoid conflicts
+      DefinitionString: !Sub 
+        - |
+          {
+            "Comment": "SpandWeather Incremental Pipeline with Alerts",
+            "StartAt": "BronzeProcessed",
+            "States": {
+              "BronzeProcessed": {
+                "Type": "Task",
+                "Resource": "arn:aws:states:::glue:startJobRun.sync",
+                "Parameters": {
+                  "JobName": "${JobBronze}"
+                },
+                "Catch": [{"ErrorEquals": ["States.ALL"], "Next": "NotifyFailure"}],
+                "Next": "SilverCleanse"
+              },
+              "SilverCleanse": {
+                "Type": "Task",
+                "Resource": "arn:aws:states:::glue:startJobRun.sync",
+                "Parameters": {
+                  "JobName": "${JobSilver}"
+                },
+                "Catch": [{"ErrorEquals": ["States.ALL"], "Next": "NotifyFailure"}],
+                "Next": "GoldCuration"
+              },
+              "GoldCuration": {
+                "Type": "Task",
+                "Resource": "arn:aws:states:::glue:startJobRun.sync",
+                "Parameters": {
+                  "JobName": "${JobGold}"
+                },
+                "Catch": [{"ErrorEquals": ["States.ALL"], "Next": "NotifyFailure"}],
+                "Next": "NotifySuccess"
+              },
+              "NotifySuccess": {
+                "Type": "Task",
+                "Resource": "arn:aws:states:::sns:publish",
+                "Parameters": {
+                  "TopicArn": "${SnsTopicArnVar}",
+                  "Subject": "SpandWeather Pipeline SUCCESS",
+                  "Message": "Incremental pipeline completed successfully"
+                },
+                "End": true
+              },
+              "NotifyFailure": {
+                "Type": "Task",
+                "Resource": "arn:aws:states:::sns:publish",
+                "Parameters": {
+                  "TopicArn": "${SnsTopicArnVar}",
+                  "Subject": "SpandWeather Pipeline FAILURE",
+                  "Message": "Incremental pipeline failed."
+                },
+                "End": true
+              }
+            }
+          }
+        - JobBronze: !Sub "${ProjectName}-${Environment}-bronze-processed"
+          JobSilver: !Sub "${ProjectName}-${Environment}-silver-cleanse"
+          JobGold: !Sub "${ProjectName}-${Environment}-gold-curation"
+          SnsTopicArnVar: !ImportValue spandweather-dev-sns-topic
+      # DefinitionSubstitutions is actually redundant when using !Sub this way, 
+      # but if you use it, the indentation must be exactly here:
+      DefinitionSubstitutions:
+        SnsTopicArnVar: !ImportValue spandweather-dev-sns-topic
+
+Outputs:
+  StateMachineArn:
+    Value: !Ref IncrementalStateMachine

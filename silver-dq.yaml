@@ -1,0 +1,36 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  SpandWeather Silver Data Quality Ruleset
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: spandweather
+
+  Environment:
+    Type: String
+    Default: dev
+
+Resources:
+
+  SilverDQRuleset:
+    Type: AWS::Glue::DataQualityRuleset
+    Properties:
+      Name: !Sub "${ProjectName}-${Environment}-silver-dq-ruleset"
+      TargetTable:
+        DatabaseName: !Sub "${ProjectName}_${Environment}_silver"
+        TableName: silver_silverstaging
+      Ruleset: |
+        Rules = [
+          IsComplete "city",
+          IsComplete "timestamp",
+          IsComplete "temperature",
+          ColumnValues "temperature" between -60 and 60,
+          ColumnValues "humidity" between 0 and 100
+        ]
+
+Outputs:
+  SilverDQRulesetName:
+    Value: !Ref SilverDQRuleset
+    Export:
+      Name: !Sub "${ProjectName}-${Environment}-silver-dq-ruleset"

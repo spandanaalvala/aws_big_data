@@ -1,0 +1,43 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  SpandWeather Watermark DynamoDB Table
+  Tracks incremental processing state for Glue jobs
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: spandweather
+
+  Environment:
+    Type: String
+    Default: dev
+
+Resources:
+
+  WatermarkTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "${ProjectName}-${Environment}-watermark"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: pipeline_stage
+          AttributeType: S
+        - AttributeName: dataset
+          AttributeType: S
+      KeySchema:
+        - AttributeName: pipeline_stage
+          KeyType: HASH
+        - AttributeName: dataset
+          KeyType: RANGE
+
+Outputs:
+
+  WatermarkTableName:
+    Value: !Ref WatermarkTable
+    Export:
+      Name: !Sub "${ProjectName}-${Environment}-watermark-table"
+
+  WatermarkTableArn:
+    Value: !GetAtt WatermarkTable.Arn
+    Export:
+      Name: !Sub "${ProjectName}-${Environment}-watermark-table-arn"

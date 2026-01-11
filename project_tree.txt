@@ -1,0 +1,28 @@
+Cloud Formation Weather/
+├── bronze-glue.yaml
+├── bronze-lambda.yaml
+├── foundation.yaml
+├── gold-crawlers.yaml
+├── gold-glue.yaml
+├── iam.yaml
+├── info.txt
+├── openmeteotest.py
+├── silver-crawler.yaml
+├── silver-dq.yaml
+├── silver-glue.yaml
+├── stepfunction-incremental.yaml
+├── watermark-dynamodb.yaml
+├── bronze_ingestion/
+│   └── handler.py
+├── glue/
+│   ├── bronze/
+│   │   └── bronze_to_processed.py
+│   ├── gold/
+│   │   └── star_schema.py
+│   └── silver/
+│       └── cleanse.py
+└── lambda/
+    ├── incremental_producer/
+    │   └── handler.py
+    └── kinesis_consumer/
+        └── handler.py

@@ -1,0 +1,37 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: Gold Glue Crawlers for Star Schema Tables
+
+Resources:
+
+  GoldFactCrawler:
+    Type: AWS::Glue::Crawler
+    Properties:
+      Name: spandweather-dev-gold-fact-weather-crawler
+      Role: !ImportValue spandweather-dev-glue-job-role-arn-v1
+      DatabaseName: spandweather_dev_gold
+      Targets:
+        S3Targets:
+          - Path: s3://spandweather-dev-datalake/goldcurated/fact_weather/
+      TablePrefix: gold_
+
+  GoldDimTimeCrawler:
+    Type: AWS::Glue::Crawler
+    Properties:
+      Name: spandweather-dev-gold-dim-time-crawler
+      Role: !ImportValue spandweather-dev-glue-job-role-arn-v1
+      DatabaseName: spandweather_dev_gold
+      Targets:
+        S3Targets:
+          - Path: s3://spandweather-dev-datalake/goldcurated/dim_time/
+      TablePrefix: gold_
+
+  GoldDimLocationCrawler:
+    Type: AWS::Glue::Crawler
+    Properties:
+      Name: spandweather-dev-gold-dim-location-crawler
+      Role: !ImportValue spandweather-dev-glue-job-role-arn-v1
+      DatabaseName: spandweather_dev_gold
+      Targets:
+        S3Targets:
+          - Path: s3://spandweather-dev-datalake/goldcurated/dim_location/
+      TablePrefix: gold_

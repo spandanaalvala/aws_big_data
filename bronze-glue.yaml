@@ -1,0 +1,40 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  SpandWeather Bronze Processing
+  Raw Bronze → Processed Bronze
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: spandweather
+
+  Environment:
+    Type: String
+    Default: dev
+
+Resources:
+
+  BronzeProcessedGlueJob:
+    Type: AWS::Glue::Job
+    Properties:
+      Name: !Sub "${ProjectName}-${Environment}-bronze-processed"
+      Role: !ImportValue spandweather-dev-glue-job-role-arn-v1
+      GlueVersion: "5.0"
+      WorkerType: G.1X
+      NumberOfWorkers: 2
+      Command:
+        Name: glueetl
+        PythonVersion: "3"
+        ScriptLocation: !Sub
+          - "s3://spandweather-dev-artifacts/glue/bronze/bronze_to_processed.py"
+          - Bucket: !ImportValue spandweather-dev-datalake-bucket
+          
+      DefaultArguments:
+        "--job-language": "python"
+        "--enable-glue-datacatalog": "true"
+
+Outputs:
+  BronzeProcessedJobName:
+    Value: !Ref BronzeProcessedGlueJob
+    Export:
+      Name: !Sub "${ProjectName}-${Environment}-bronze-processed-job"

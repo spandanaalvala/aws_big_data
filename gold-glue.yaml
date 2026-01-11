@@ -1,0 +1,39 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  SpandWeather Gold Layer
+  Star Schema creation with incremental processing
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: spandweather
+
+  Environment:
+    Type: String
+    Default: dev
+
+Resources:
+
+  GoldGlueJob:
+    Type: AWS::Glue::Job
+    Properties:
+      Name: !Sub "${ProjectName}-${Environment}-gold-curation"
+      Role: !ImportValue spandweather-dev-glue-job-role-arn-v1
+      GlueVersion: "5.0"
+      WorkerType: G.1X
+      NumberOfWorkers: 2
+      ExecutionProperty:
+        MaxConcurrentRuns: 1
+      Command:
+        Name: glueetl
+        PythonVersion: "3"
+        ScriptLocation: "s3://spandweather-dev-artifacts/glue/gold/star_schema.py"
+      DefaultArguments:
+        "--job-language": "python"
+        "--enable-glue-datacatalog": "true"
+
+Outputs:
+  GoldGlueJobName:
+    Value: !Ref GoldGlueJob
+    Export:
+      Name: !Sub "${ProjectName}-${Environment}-gold-glue-job"

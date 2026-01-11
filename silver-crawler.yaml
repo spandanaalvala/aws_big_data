@@ -1,0 +1,37 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  SpandWeather Silver Glue Crawler
+  Registers Silver tables in Glue Catalog
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: spandweather
+
+  Environment:
+    Type: String
+    Default: dev
+
+Resources:
+
+  SilverCrawler:
+    Type: AWS::Glue::Crawler
+    Properties:
+      Name: !Sub "${ProjectName}-${Environment}-silver-crawler"
+      Role: !ImportValue spandweather-dev-glue-job-role-arn-v1
+      DatabaseName: !Sub "${ProjectName}_${Environment}_silver"
+      Targets:
+        S3Targets:
+          - Path: !Sub
+              - "s3://${Bucket}/silverstaging/"
+              - Bucket: !ImportValue spandweather-dev-datalake-bucket
+      SchemaChangePolicy:
+        UpdateBehavior: UPDATE_IN_DATABASE
+        DeleteBehavior: LOG
+      TablePrefix: silver_
+
+Outputs:
+  SilverCrawlerName:
+    Value: !Ref SilverCrawler
+    Export:
+      Name: !Sub "${ProjectName}-${Environment}-silver-crawler"

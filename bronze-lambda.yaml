@@ -1,0 +1,173 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  SpandWeather Bronze Ingestion
+  Full-load + Streaming Lambdas with bad data simulation
+
+Parameters:
+  ProjectName:
+    Type: String
+    Default: spandweather
+
+  Environment:
+    Type: String
+    Default: dev
+
+Resources:
+
+  ### Full Load Lambda ###
+  BronzeFullLoadLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${ProjectName}-${Environment}-bronze-full-load"
+      Runtime: python3.10
+      Handler: handler.lambda_handler
+      Timeout: 300
+      MemorySize: 512
+      Role: !ImportValue spandweather-dev-bronze-lambda-role-arn-v1
+      Environment:
+        Variables:
+          S3_BUCKET: !ImportValue spandweather-dev-datalake-bucket
+          S3_PREFIX: rawbronze/rawtoprocess/full_load/
+          SOURCE_TYPE: full
+      Code:
+        S3Bucket: spandweather-dev-artifacts
+        S3Key: lambda/bronze_ingestion.zip
+
+  ### Streaming Producer Lambda ###
+  BronzeStreamingLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${ProjectName}-${Environment}-bronze-streaming"
+      Runtime: python3.10
+      Handler: handler.lambda_handler
+      Timeout: 60
+      MemorySize: 256
+      Role: !ImportValue spandweather-dev-bronze-lambda-role-arn-v1
+      Environment:
+        Variables:
+          KINESIS_STREAM_NAME: !ImportValue spandweather-dev-kinesis-stream
+          DLQ_URL: !ImportValue spandweather-dev-dlq
+          SNS_TOPIC_ARN: !ImportValue spandweather-dev-sns-topic
+          SOURCE_TYPE: streaming
+      Code:
+        S3Bucket: spandweather-dev-artifacts
+        S3Key: lambda/bronze_ingestion.zip
+
+  ### EventBridge – Weekly Full Load ###
+  FullLoadSchedule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub "${ProjectName}-${Environment}-full-load-schedule"
+      ScheduleExpression: rate(7 days)
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt BronzeFullLoadLambda.Arn
+          Id: FullLoadTarget
+
+  PermissionForEventBridgeFullLoad:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref BronzeFullLoadLambda
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt FullLoadSchedule.Arn
+
+  ### EventBridge – Streaming (5 min) ###
+  StreamingSchedule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: !Sub "${ProjectName}-${Environment}-streaming-schedule"
+      ScheduleExpression: rate(5 minutes)
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt BronzeStreamingLambda.Arn
+          Id: StreamingTarget
+
+  PermissionForEventBridgeStreaming:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref BronzeStreamingLambda
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt StreamingSchedule.Arn
+  BronzeKinesisConsumerLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "${ProjectName}-${Environment}-bronze-kinesis-consumer"
+      Runtime: python3.10
+      Handler: handler.lambda_handler
+      Timeout: 60
+      MemorySize: 256
+      Role: !ImportValue spandweather-dev-bronze-lambda-role-arn-v1
+      Environment:
+        Variables:
+          S3_BUCKET: !ImportValue spandweather-dev-datalake-bucket
+          S3_PREFIX: rawbronze/rawtoprocess/streaming/
+          DLQ_URL: !ImportValue spandweather-dev-dlq
+          SNS_TOPIC_ARN: !ImportValue spandweather-dev-sns-topic
+          ALERT_CITY: Mumbai
+          TEMP_THRESHOLD: "20"
+
+      Code:
+        S3Bucket: spandweather-dev-artifacts
+        S3Key: lambda/kinesis_consumer.zip
+
+
+  KinesisToBronzeConsumerMapping:
+    Type: AWS::Lambda::EventSourceMapping
+    Properties:
+      EventSourceArn: !Sub
+        - "arn:aws:kinesis:${AWS::Region}:${AWS::AccountId}:stream/${StreamName}"
+        - StreamName: !ImportValue spandweather-dev-kinesis-stream
+      FunctionName: !Ref BronzeKinesisConsumerLambda
+      StartingPosition: LATEST
+      BatchSize: 100
+      Enabled: true
+
+  IncrementalProducerLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: spandweather-dev-incremental-producer
+      Runtime: python3.10
+      Handler: handler.lambda_handler
+      Timeout: 60
+      MemorySize: 256
+      Role: !ImportValue spandweather-dev-bronze-lambda-role-arn-v1
+      Environment:
+        Variables:
+          KINESIS_STREAM_NAME: !ImportValue spandweather-dev-kinesis-stream
+      Code:
+        S3Bucket: spandweather-dev-artifacts
+        S3Key: lambda/incremental_producer.zip
+
+  IncrementalProducerSchedule:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: spandweather-dev-incremental-producer-schedule
+      ScheduleExpression: rate(5 minutes)
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt IncrementalProducerLambda.Arn
+          Id: IncrementalProducerTarget
+
+  PermissionForIncrementalProducer:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref IncrementalProducerLambda
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt IncrementalProducerSchedule.Arn
+
+Outputs:
+
+  FullLoadLambdaName:
+    Value: !Ref BronzeFullLoadLambda
+    Export:
+      Name: !Sub "${ProjectName}-${Environment}-bronze-full-load-lambda"
+
+  StreamingLambdaName:
+    Value: !Ref BronzeStreamingLambda
+    Export:
+      Name: !Sub "${ProjectName}-${Environment}-bronze-streaming-lambda"
+
+

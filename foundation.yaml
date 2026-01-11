@@ -1,0 +1,147 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  SpandWeather Dev Foundation Stack
+  Core shared resources for the data platform.
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+
+  ProjectName:
+    Type: String
+    Default: spandweather
+
+Resources:
+
+  ### S3 Datalake Bucket ###
+  DataLakeBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "${ProjectName}-${Environment}-datalake"
+      VersioningConfiguration:
+        Status: Enabled
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  ### Kinesis Stream ###
+  WeatherKinesisStream:
+    Type: AWS::Kinesis::Stream
+    Properties:
+      Name: !Sub "${ProjectName}-${Environment}-bronze-kinesis-weather"
+      ShardCount: 1
+      RetentionPeriodHours: 24
+
+  ### SQS Dead Letter Queue ###
+  BronzeDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub "${ProjectName}-${Environment}-bronze-dlq"
+      MessageRetentionPeriod: 1209600
+
+  ### SNS Topic ###
+  AlertSNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub "${ProjectName}-${Environment}-alerts"
+
+  ### DynamoDB Latest State Table ###
+  WeatherLatestTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub "${ProjectName}-${Environment}-weather-latest"
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: city
+          AttributeType: S
+        - AttributeName: timestamp
+          AttributeType: S
+      KeySchema:
+        - AttributeName: city
+          KeyType: HASH
+        - AttributeName: timestamp
+          KeyType: RANGE
+
+  ### Glue Databases ###
+  BronzeGlueDB:
+    Type: AWS::Glue::Database
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseInput:
+        Name: !Sub "${ProjectName}_${Environment}_bronze"
+
+  SilverGlueDB:
+    Type: AWS::Glue::Database
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseInput:
+        Name: !Sub "${ProjectName}_${Environment}_silver"
+
+  GoldGlueDB:
+    Type: AWS::Glue::Database
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseInput:
+        Name: !Sub "${ProjectName}_${Environment}_gold"
+
+  ### Base IAM Role (Imported by iam.yaml later) ###
+  BaseGlueRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "${ProjectName}-${Environment}-glue-base-role"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: glue.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSGlueServiceRole
+
+Outputs:
+
+  DataLakeBucketName:
+    Value: !Ref DataLakeBucket
+    Export:
+      Name: !Sub "${ProjectName}-${Environment}-datalake-bucket"
+
+  KinesisStreamName:
+    Value: !Ref WeatherKinesisStream
+    Export:
+      Name: !Sub "${ProjectName}-${Environment}-kinesis-stream"
+
+  DLQName:
+    Value: !Ref BronzeDLQ
+    Export:
+      Name: !Sub "${ProjectName}-${Environment}-dlq"
+
+  SNSTopicArn:
+    Value: !Ref AlertSNSTopic
+    Export:
+      Name: !Sub "${ProjectName}-${Environment}-sns-topic"
+
+  DynamoDBTableName:
+    Value: !Ref WeatherLatestTable
+    Export:
+      Name: !Sub "${ProjectName}-${Environment}-dynamodb-latest"
+
+  BronzeGlueDBName:
+    Value: !Ref BronzeGlueDB
+    Export:
+      Name: !Sub "${ProjectName}-${Environment}-bronze-db"
+
+  SilverGlueDBName:
+    Value: !Ref SilverGlueDB
+    Export:
+      Name: !Sub "${ProjectName}-${Environment}-silver-db"
+
+  GoldGlueDBName:
+    Value: !Ref GoldGlueDB
+    Export:
+      Name: !Sub "${ProjectName}-${Environment}-gold-db"
