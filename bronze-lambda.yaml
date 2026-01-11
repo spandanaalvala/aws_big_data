@@ -14,7 +14,7 @@ Parameters:
 
 Resources:
 
-  ### Full Load Lambda ###
+  ### Full Load Lambda updated###
   BronzeFullLoadLambda:
     Type: AWS::Lambda::Function
     Properties:
