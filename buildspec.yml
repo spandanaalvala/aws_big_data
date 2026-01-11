@@ -1,0 +1,26 @@
+version: 0.2
+
+phases:
+  install:
+    runtime-versions:
+      python: 3.11
+
+  build:
+    commands:
+      # Validate CloudFormation
+      - aws cloudformation validate-template --template-body file://cloudformation/foundation.yaml
+      - aws cloudformation validate-template --template-body file://cloudformation/iam.yaml
+      - aws cloudformation validate-template --template-body file://cloudformation/bronze-lambda.yaml
+      - aws cloudformation validate-template --template-body file://cloudformation/silver-glue.yaml
+      - aws cloudformation validate-template --template-body file://cloudformation/gold-glue.yaml
+      - aws cloudformation validate-template --template-body file://cloudformation/stepfunction.yaml
+
+      # Package Lambda functions
+      - cd lambda/full_load && zip -r full_load.zip handler.py && aws s3 cp full_load.zip s3://spandweather-dev-artifacts/lambda/full_load.zip
+      - cd ../streaming_producer && zip -r streaming_producer.zip handler.py && aws s3 cp streaming_producer.zip s3://spandweather-dev-artifacts/lambda/streaming_producer.zip
+      - cd ../kinesis_consumer && zip -r kinesis_consumer.zip handler.py && aws s3 cp kinesis_consumer.zip s3://spandweather-dev-artifacts/lambda/kinesis_consumer.zip
+      - cd ../../
+
+      # Upload Glue scripts
+      - aws s3 cp glue/silver/cleanse.py s3://spandweather-dev-artifacts/glue/silver/cleanse.py
+      - aws s3 cp glue/gold/star_schema.py s3://spandweather-dev-artifacts/glue/gold/star_schema.py
