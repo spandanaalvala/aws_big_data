@@ -77,7 +77,7 @@ Resources:
     Type: AWS::Events::Rule
     Properties:
       Name: !Sub "${ProjectName}-${Environment}-streaming-schedule"
-      ScheduleExpression: rate(5 minutes)
+      ScheduleExpression: rate(5 hours)
       State: ENABLED
       Targets:
         - Arn: !GetAtt BronzeStreamingLambda.Arn
